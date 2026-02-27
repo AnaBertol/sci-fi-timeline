@@ -494,3 +494,72 @@ body {
 #info::-webkit-scrollbar { width: 4px; }
 #info::-webkit-scrollbar-track { background: transparent; }
 #info::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 2px; }
+
+/* Handle only visible on mobile */
+#info-handle { display: none; }
+
+/* ── Mobile (vertical arc layout) ────────────────────────── */
+@media (max-width: 700px) {
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+    grid-template-columns: none;
+  }
+
+  #left-col {
+    flex: 1;
+    min-height: 0;
+  }
+
+  #header {
+    padding: 10px 14px 8px;
+    gap: 10px;
+  }
+
+  #header p { max-width: none; }
+
+  /* Filter buttons scroll horizontally instead of wrapping */
+  #medium-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #medium-filters::-webkit-scrollbar { display: none; }
+
+  /* Bottom sheet */
+  #info {
+    position: fixed;
+    inset: auto 0 0 0;
+    height: 65vh;
+    border-left: none;
+    border-top: 1px solid #ffffff18;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 200;
+    padding: 0 18px 32px;
+  }
+
+  #info.open { transform: translateY(0); }
+
+  #info-handle {
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: #ffffff28;
+    border-radius: 2px;
+    margin: 12px auto 8px;
+    flex-shrink: 0;
+    cursor: grab;
+  }
+
+  /* Credits stay visible above bottom sheet */
+  #source-credit { z-index: 10; bottom: 6px; }
+  #authorship    { z-index: 10; bottom: 6px; }
+
+  /* Hide legend (no space on narrow screen) */
+  .g-legend { display: none; }
+}

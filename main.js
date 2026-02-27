@@ -9,7 +9,8 @@ const LOG_SPLIT_FRAC = 0.60;   // fraction of inner width for linear portion in 
 const LOG_MAX        = 1e13;   // right-edge year in log mode
 const NOW            = 2026;
 
-const MARGIN = { left: 56, right: 36, top: 32, bottom: 48 };
+const MARGIN   = { left: 56, right: 36, top: 32, bottom: 48 };
+const MARGIN_V = { top: 56, bottom: 56, left: 44, right: 20 };  // mobile vertical mode
 
 const ARC_HEIGHT_RATIO = 0.76;   // arc height = pixel_span × ratio (capped)
 const ARC_MIN_H        = 6;
@@ -50,12 +51,16 @@ let selectedId    = null;
 let _ttTimer = null;   // mini-tooltip hide timer
 
 // SVG references (refreshed on each drawViz call)
-let svgSel = null;
-let gArcs  = null;
-let gHigh  = null;
-let scaleX = null;   // function(year) → pixel x
-let yMid   = 0;
-let maxArcH = 0;
+let svgSel  = null;
+let gArcs   = null;
+let gHigh   = null;
+let isMobile = false;
+let scaleX  = null;   // horizontal scale (desktop)
+let scaleY  = null;   // vertical scale (mobile)
+let yMid    = 0;      // axis y-center (desktop)
+let xMid    = 0;      // axis x-center (mobile)
+let maxArcH = 0;      // max vertical arc extent (desktop)
+let maxArcW = 0;      // max horizontal arc extent (mobile)
 
 // ═══════════════════════════════════════════════════════════
 //  UTILS
@@ -118,6 +123,30 @@ function buildScaleX(W) {
   }
 }
 
+function buildScaleY(H) {
+  const innerH = H - MARGIN_V.top - MARGIN_V.bottom;
+  if (!isLogScale) {
+    const s = d3.scaleLinear()
+      .domain([AXIS_MIN, AXIS_MAX_LIN])
+      .range([MARGIN_V.top, H - MARGIN_V.bottom]);
+    scaleY             = y => s(Math.max(AXIS_MIN, Math.min(y, AXIS_MAX_LIN)));
+    scaleY.isFarFuture = y => y > AXIS_MAX_LIN;
+    scaleY.linTicks    = d3.range(1800, AXIS_MAX_LIN + 1, 100);
+    scaleY.logTicks    = null;
+  } else {
+    const splitY = MARGIN_V.top + innerH * LOG_SPLIT_FRAC;
+    const linS   = d3.scaleLinear().domain([AXIS_MIN, LOG_CUTOFF]).range([MARGIN_V.top, splitY]);
+    const logS   = d3.scaleLog().domain([LOG_CUTOFF, LOG_MAX]).range([splitY, H - MARGIN_V.bottom]);
+    scaleY = y => {
+      if (y <= LOG_CUTOFF) return linS(Math.max(AXIS_MIN, y));
+      return Math.min(logS(Math.min(y, LOG_MAX)), H - MARGIN_V.bottom);
+    };
+    scaleY.isFarFuture = y => y > LOG_MAX;
+    scaleY.linTicks    = d3.range(1800, LOG_CUTOFF + 1, 100);
+    scaleY.logTicks    = [5e3, 1e4, 5e4, 1e5, 1e6, 1e9, 1e12];
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 //  ARC PATHS
 // ═══════════════════════════════════════════════════════════
@@ -129,7 +158,22 @@ function getX2(d) {
   return scaleX(d.year_set);
 }
 
+function getY2(d) {
+  if (d._isFarFuture) {
+    return scaleY(isLogScale ? Math.min(d.year_set, LOG_MAX) : AXIS_MAX_LIN);
+  }
+  return scaleY(d.year_set);
+}
+
 function makeArcPath(d) {
+  if (isMobile) {
+    const y1   = scaleY(d.released);
+    const y2   = getY2(d);
+    const span = Math.abs(y2 - y1);
+    const h    = Math.max(ARC_MIN_H, Math.min(span * ARC_HEIGHT_RATIO, maxArcW));
+    const xc   = d._above ? xMid - h : xMid + h;
+    return `M${xMid},${y1} Q${xc},${(y1 + y2) / 2} ${xMid},${y2}`;
+  }
   const x1   = scaleX(d.released);
   const x2   = getX2(d);
   const span = Math.abs(x2 - x1);
@@ -331,14 +375,7 @@ function drawViz() {
 
   svgSel.attr('width', W).attr('height', H).selectAll('*').remove();
 
-  const iH = H - MARGIN.top - MARGIN.bottom;
-  yMid    = MARGIN.top + iH * 0.5;
-  maxArcH = Math.min(iH * 0.46, 480);
-
-  buildScaleX(W);
-
-  // Update _isFarFuture for each datum based on current scale mode
-  allData.forEach(d => { d._isFarFuture = scaleX.isFarFuture(d.year_set); });
+  isMobile = window.innerWidth <= 700;
 
   // Background click deselects
   svgSel.on('click', () => { if (selectedId !== null) deselect(); });
@@ -350,7 +387,20 @@ function drawViz() {
     }
   });
 
-  drawAxis(svgSel, W, H);
+  if (isMobile) {
+    xMid    = W / 2;
+    maxArcW = Math.min(xMid - MARGIN_V.left, 150);
+    buildScaleY(H);
+    allData.forEach(d => { d._isFarFuture = scaleY.isFarFuture(d.year_set); });
+    drawAxisV(svgSel, W, H);
+  } else {
+    const iH = H - MARGIN.top - MARGIN.bottom;
+    yMid    = MARGIN.top + iH * 0.5;
+    maxArcH = Math.min(iH * 0.46, 480);
+    buildScaleX(W);
+    allData.forEach(d => { d._isFarFuture = scaleX.isFarFuture(d.year_set); });
+    drawAxis(svgSel, W, H);
+  }
 
   // Arcs layer — visual only, no pointer events
   gArcs = svgSel.append('g').attr('class', 'g-arcs');
@@ -371,7 +421,7 @@ function drawViz() {
   // Highlight overlay — no pointer events
   gHigh = svgSel.append('g').attr('class', 'g-highlight').attr('pointer-events', 'none');
 
-  drawLegend(svgSel, W, H);
+  if (!isMobile) drawLegend(svgSel, W, H);
 
   // Restore selection state after redraw (resize / scale change)
   if (selectedId !== null) {
@@ -490,6 +540,88 @@ function drawLegend(svg, W, H) {
     .text("Each arc connects a work's release year to the year it is set in");
 }
 
+// ─── Vertical Axis (mobile) ─────────────────────────────────
+
+function drawAxisV(svg, W, H) {
+  const g = svg.append('g').attr('class', 'g-axis');
+
+  // Vertical baseline
+  g.append('line')
+    .attr('class', 'axis-line')
+    .attr('x1', xMid).attr('x2', xMid)
+    .attr('y1', MARGIN_V.top).attr('y2', H - MARGIN_V.bottom);
+
+  // Ticks
+  (scaleY.linTicks || []).forEach(t => {
+    const y     = scaleY(t);
+    const isMaj = t % 100 === 0;
+    const tW    = isMaj ? 8 : 4;
+
+    g.append('line')
+      .attr('class', 'tick-line')
+      .attr('x1', xMid - tW).attr('x2', xMid + tW)
+      .attr('y1', y).attr('y2', y)
+      .attr('opacity', isMaj ? 0.38 : 0.18);
+
+    if (isMaj) {
+      g.append('text')
+        .attr('class', 'tick-label')
+        .attr('x', xMid - 13).attr('y', y + 4)
+        .attr('text-anchor', 'end')
+        .text(t);
+    }
+  });
+
+  // Log-scale ticks
+  if (isLogScale && scaleY.logTicks) {
+    scaleY.logTicks.forEach(t => {
+      const y = scaleY(t);
+      if (y > H - MARGIN_V.bottom - 2) return;
+      g.append('line')
+        .attr('class', 'tick-line')
+        .attr('x1', xMid - 8).attr('x2', xMid + 8)
+        .attr('y1', y).attr('y2', y)
+        .attr('opacity', 0.38);
+      g.append('text')
+        .attr('class', 'tick-label')
+        .attr('x', xMid - 13).attr('y', y + 4)
+        .attr('text-anchor', 'end')
+        .text(formatAxisYear(t));
+    });
+
+    // Dashed boundary at linear/log split
+    const ySplit = scaleY(LOG_CUTOFF);
+    g.append('line')
+      .attr('x1', xMid - maxArcW - 6).attr('x2', xMid + maxArcW + 6)
+      .attr('y1', ySplit).attr('y2', ySplit)
+      .attr('stroke', '#ffffff0a').attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4 4');
+  }
+
+  // "Today" marker — horizontal line
+  const yNow = scaleY(NOW);
+  g.append('line')
+    .attr('class', 'now-line')
+    .attr('x1', xMid - maxArcW - 16).attr('x2', xMid + maxArcW + 16)
+    .attr('y1', yNow).attr('y2', yNow);
+  g.append('text')
+    .attr('class', 'now-label')
+    .attr('x', xMid + maxArcW + 22).attr('y', yNow + 4)
+    .attr('text-anchor', 'start')
+    .text('today');
+
+  // Clipping note in linear mode
+  if (!isLogScale) {
+    g.append('text')
+      .attr('class', 'tick-label')
+      .attr('x', xMid - 13)
+      .attr('y', H - MARGIN_V.bottom + 18)
+      .attr('text-anchor', 'end')
+      .attr('font-size', '9px')
+      .text('> ' + formatAxisYear(AXIS_MAX_LIN));
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 //  HIGHLIGHT
 // ═══════════════════════════════════════════════════════════
@@ -527,6 +659,26 @@ function applyHighlight(d, isSelected) {
 function drawOverlay(d, isSelected) {
   gHigh.selectAll('*').remove();
   const color = mColor(d.medium);
+
+  // Mobile: simplified overlay — just dots on the axis
+  if (isMobile) {
+    const y1 = scaleY(d.released);
+    const y2 = getY2(d);
+    [y1, y2].forEach(y => {
+      gHigh.append('circle')
+        .attr('cx', xMid).attr('cy', y)
+        .attr('r', 5).attr('fill', color).attr('opacity', 0.95);
+    });
+    if (isSelected) {
+      gHigh.append('circle')
+        .attr('cx', xMid).attr('cy', y1)
+        .attr('r', 12).attr('fill', 'none')
+        .attr('stroke', color).attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '3 2').attr('opacity', 0.55);
+    }
+    return;
+  }
+
   const x1    = scaleX(d.released);
   const x2    = getX2(d);
 
@@ -706,6 +858,7 @@ function hideMiniTooltip() {
 function updateSidebar(d, siblings) {
   document.getElementById('info-empty').style.display   = 'none';
   document.getElementById('info-content').style.display = 'flex';
+  if (isMobile) document.getElementById('info').classList.add('open');
 
   document.getElementById('info-title').textContent   = d.title   || '—';
   document.getElementById('info-creator').textContent = d.creator || '';
@@ -810,6 +963,7 @@ function updateSidebar(d, siblings) {
 function showEmptySidebar() {
   document.getElementById('info-empty').style.display   = '';
   document.getElementById('info-content').style.display = 'none';
+  if (isMobile) document.getElementById('info').classList.remove('open');
 }
 
 function addBadge(parent, text, color) {
