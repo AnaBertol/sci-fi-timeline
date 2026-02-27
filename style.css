@@ -495,8 +495,9 @@ body {
 #info::-webkit-scrollbar-track { background: transparent; }
 #info::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 2px; }
 
-/* Handle only visible on mobile */
+/* Handle and bottom-nav only visible on mobile */
 #info-handle { display: none; }
+#bottom-nav   { display: none; }
 
 /* ── Mobile (vertical arc layout) ────────────────────────── */
 @media (max-width: 700px) {
@@ -520,8 +521,16 @@ body {
 
   #header p { max-width: none; }
 
+  /* Hide "Medium" / "Scale" labels to save space */
+  .control-label { display: none; }
+
+  /* First control row: don't wrap, let filters scroll */
+  .control-row:first-child { flex-wrap: nowrap; overflow: hidden; }
+
   /* Filter buttons scroll horizontally instead of wrapping */
   #medium-filters {
+    flex: 1;
+    min-width: 0;
     flex-wrap: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -562,4 +571,48 @@ body {
 
   /* Hide legend (no space on narrow screen) */
   .g-legend { display: none; }
+
+  /* ── Bottom sheet navigation ── */
+  #bottom-nav {
+    display: none;            /* shown via .visible class in JS */
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 14px;
+    border-bottom: 1px solid #ffffff0a;
+    position: sticky;
+    top: 0;
+    background: #1c1c2e;
+    z-index: 1;
+    margin: 0 -18px;
+    padding: 6px 18px 12px;
+  }
+
+  #bottom-nav.visible { display: flex; }
+
+  .bnav-btn {
+    background: #2a2a40;
+    border: none;
+    color: #f0ede8;
+    font-size: 1.1rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+
+  .bnav-btn:active { background: #3a3a54; }
+  .bnav-btn:disabled { opacity: 0.25; cursor: default; }
+
+  #bnav-count {
+    font-size: 0.72rem;
+    color: #44445a;
+    text-align: center;
+    flex: 1;
+  }
 }

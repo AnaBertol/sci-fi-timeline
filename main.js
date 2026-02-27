@@ -47,6 +47,7 @@ let isLogScale     = false;
 let searchQuery   = '';
 let hoveredId     = null;
 let selectedId    = null;
+let selectedIdx   = -1;   // index in allData of selected arc (for mobile prev/next nav)
 
 let _ttTimer = null;   // mini-tooltip hide timer
 
@@ -222,6 +223,48 @@ d3.csv('./futuristic_fiction.csv').then(raw => {
 //  CONTROLS SETUP
 // ═══════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════
+//  MOBILE NAVIGATION (prev / next arc)
+// ═══════════════════════════════════════════════════════════
+
+function getAdjacentActive(fromIdx, dir) {
+  let i = fromIdx + dir;
+  while (i >= 0 && i < allData.length) {
+    if (isArcActive(allData[i])) return i;
+    i += dir;
+  }
+  return -1;
+}
+
+function navigateArc(dir) {
+  if (selectedIdx === -1) return;
+  const nextIdx = getAdjacentActive(selectedIdx, dir);
+  if (nextIdx === -1) return;
+  const d = allData[nextIdx];
+  selectedIdx = nextIdx;
+  selectedId  = d.record_id;
+  hoveredId   = d.record_id;
+  applyHighlight(d, true);
+  drawOverlay(d, true);
+  updateSidebar(d, getSiblings(d));
+}
+
+function updateBottomNav() {
+  if (!isMobile) return;
+  const nav = document.getElementById('bottom-nav');
+  if (selectedId === null) { nav.classList.remove('visible'); return; }
+  nav.classList.add('visible');
+  const prevIdx = getAdjacentActive(selectedIdx, -1);
+  const nextIdx = getAdjacentActive(selectedIdx, +1);
+  document.getElementById('btn-prev').disabled = prevIdx === -1;
+  document.getElementById('btn-next').disabled = nextIdx === -1;
+  // count: position among active arcs
+  const active = allData.filter(isArcActive);
+  const pos    = active.findIndex(d => d.record_id === selectedId) + 1;
+  document.getElementById('bnav-count').textContent =
+    active.length ? `${pos} / ${active.length}` : '';
+}
+
 function setupControls() {
   // Medium buttons
   const mf = document.getElementById('medium-filters');
@@ -267,6 +310,10 @@ function setupControls() {
     document.getElementById('search-clear').style.display = 'none';
     applyCurrentFilter();
   });
+
+  // Mobile prev / next navigation
+  document.getElementById('btn-prev').addEventListener('click', e => { e.stopPropagation(); navigateArc(-1); });
+  document.getElementById('btn-next').addEventListener('click', e => { e.stopPropagation(); navigateArc(+1); });
 }
 
 function makeMediumBtn(label, color, medium) {
@@ -798,19 +845,23 @@ function onClick(event, d) {
     // Clicking the selected arc again → deselect
     deselect();
   } else {
-    selectedId = d.record_id;
-    hoveredId  = d.record_id;
+    selectedId  = d.record_id;
+    selectedIdx = allData.indexOf(d);
+    hoveredId   = d.record_id;
     hideMiniTooltip();
     applyHighlight(d, true);
     drawOverlay(d, true);
     updateSidebar(d, getSiblings(d));
+    updateBottomNav();
   }
 }
 
 function deselect() {
-  selectedId = null;
-  hoveredId  = null;
+  selectedId  = null;
+  selectedIdx = -1;
+  hoveredId   = null;
   hideMiniTooltip();
+  updateBottomNav();
   gHigh.selectAll('*').remove();
   applyCurrentFilter();
   showEmptySidebar();
