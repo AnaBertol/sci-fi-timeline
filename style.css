@@ -495,6 +495,37 @@ body {
 #info::-webkit-scrollbar-track { background: transparent; }
 #info::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 2px; }
 
+/* Label toggle button */
+#btn-labels {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #44445a;
+  background: transparent;
+  color: #44445a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  padding: 0;
+}
+
+#btn-labels:hover { border-color: #8888aa; color: #c8c4d0; }
+
+#btn-labels.active {
+  border-color: #FFCD8E;
+  color: #FFCD8E;
+  background: #FFCD8E18;
+}
+
+/* Close panel button (mobile only) */
+#btn-close-info { display: none; }
+
+/* Mobile label panel — only shown on mobile via JS */
+#mobile-label-panel { display: none; }
+
 /* Handle and bottom-nav only visible on mobile */
 #info-handle { display: none; }
 #bottom-nav   { display: none; }
@@ -524,7 +555,6 @@ body {
   /* Hide "Medium" / "Scale" labels to save space */
   .control-label { display: none; }
 
-
   /* Bottom sheet */
   #info {
     position: fixed;
@@ -553,6 +583,24 @@ body {
     cursor: grab;
   }
 
+  /* Close panel button */
+  #btn-close-info {
+    display: block;
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    background: none;
+    border: none;
+    color: #44445a;
+    font-size: 1.4rem;
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+    transition: color 0.12s;
+    z-index: 1;
+  }
+  #btn-close-info:hover { color: #c8c4d0; }
+
   /* Credits stay visible above bottom sheet */
   #source-credit { z-index: 10; bottom: 6px; }
   #authorship    { z-index: 10; bottom: 6px; }
@@ -560,22 +608,93 @@ body {
   /* Hide legend (no space on narrow screen) */
   .g-legend { display: none; }
 
-  /* ── Bottom sheet navigation ── */
+  /* ── Mobile label panel (stacked on the left side of the viz) ── */
+  #mobile-label-panel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 122px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 10px 10px 4px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 5;
+    pointer-events: none;
+    /* fade out toward the arc area so the edge isn't a hard cut */
+    -webkit-mask-image: linear-gradient(to right, black 70%, transparent);
+    mask-image: linear-gradient(to right, black 70%, transparent);
+  }
+
+  #mobile-label-panel.visible { display: flex; }
+
+  .mobile-label-card {
+    background: #1a1a2e;
+    border: 1px solid;
+    border-radius: 5px;
+    padding: 4px 6px;
+    pointer-events: all;
+    flex-shrink: 0;
+  }
+
+  .mlc-title {
+    font-size: 0.67rem;
+    line-height: 1.3;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  .mlc-years {
+    font-size: 0.6rem;
+    color: #8888aa;
+    margin-top: 1px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  /* ── Fixed bottom navigation bar ── */
   #bottom-nav {
     display: none;            /* shown via .visible class in JS */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     align-items: center;
-    justify-content: space-between;
-    padding: 4px 0 14px;
-    border-bottom: 1px solid #ffffff0a;
-    position: sticky;
-    top: 0;
+    gap: 8px;
+    padding: 8px 18px env(safe-area-inset-bottom, 10px);
     background: #1c1c2e;
-    z-index: 1;
-    margin: 0 -18px;
-    padding: 6px 18px 12px;
+    border-top: 1px solid #ffffff14;
+    z-index: 190;             /* below info sheet z-index: 200 */
   }
 
   #bottom-nav.visible { display: flex; }
+
+  #bnav-middle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 2px;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  #bnav-title {
+    font-size: 0.73rem;
+    color: #c8c4d0;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+  }
+
+  #bnav-count {
+    font-size: 0.65rem;
+    color: #44445a;
+    text-align: center;
+  }
 
   .bnav-btn {
     background: #2a2a40;
@@ -596,11 +715,4 @@ body {
 
   .bnav-btn:active { background: #3a3a54; }
   .bnav-btn:disabled { opacity: 0.25; cursor: default; }
-
-  #bnav-count {
-    font-size: 0.72rem;
-    color: #44445a;
-    text-align: center;
-    flex: 1;
-  }
 }

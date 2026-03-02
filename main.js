@@ -49,6 +49,8 @@ let hoveredId     = null;
 let selectedId    = null;
 let selectedIdx   = -1;   // index in allData of selected arc (for mobile prev/next nav)
 
+let showLabels = false;  // toggle arc labels in viz (desktop)
+
 let _ttTimer = null;   // mini-tooltip hide timer
 
 // SVG references (refreshed on each drawViz call)
@@ -248,6 +250,7 @@ function navigateArc(dir) {
   drawOverlay(d, true);
   updateSidebar(d, getSiblings(d));
   updateBottomNav();
+  updateArcLabels();
 }
 
 function updateBottomNav() {
@@ -264,6 +267,10 @@ function updateBottomNav() {
   const pos    = active.findIndex(d => d.record_id === selectedId) + 1;
   document.getElementById('bnav-count').textContent =
     active.length ? `${pos} / ${active.length}` : '';
+  // title in the tappable center
+  const d = allData.find(r => r.record_id === selectedId);
+  const title = d ? (d.title.length > 24 ? d.title.slice(0, 24) + '…' : d.title) : '';
+  document.getElementById('bnav-title').textContent = title;
 }
 
 function setupControls() {
@@ -315,6 +322,27 @@ function setupControls() {
   // Mobile prev / next navigation
   document.getElementById('btn-prev').addEventListener('click', e => { e.stopPropagation(); navigateArc(-1); });
   document.getElementById('btn-next').addEventListener('click', e => { e.stopPropagation(); navigateArc(+1); });
+
+  // Mobile: tap the center of bottom-nav to reopen the full info sheet
+  document.getElementById('bnav-middle').addEventListener('click', () => {
+    if (selectedId !== null) {
+      const d = allData.find(r => r.record_id === selectedId);
+      if (d) updateSidebar(d, getSiblings(d));
+    }
+  });
+
+  // Mobile close panel button (closes sheet but keeps arc selected)
+  document.getElementById('btn-close-info').addEventListener('click', e => {
+    e.stopPropagation();
+    closeSidebar();
+  });
+
+  // Arc labels toggle (desktop)
+  document.getElementById('btn-labels').addEventListener('click', () => {
+    showLabels = !showLabels;
+    document.getElementById('btn-labels').classList.toggle('active', showLabels);
+    updateArcLabels();
+  });
 }
 
 function makeMediumBtn(label, color, medium) {
@@ -425,6 +453,12 @@ function drawViz() {
 
   isMobile = window.innerWidth <= 700;
 
+  // Hide mobile label panel when switching to desktop layout
+  if (!isMobile) {
+    const p = document.getElementById('mobile-label-panel');
+    if (p) { p.classList.remove('visible'); p.innerHTML = ''; }
+  }
+
   // Background click deselects
   svgSel.on('click', () => { if (selectedId !== null) deselect(); });
 
@@ -483,6 +517,7 @@ function drawViz() {
     if (d) {
       applyHighlight(d, true);
       drawOverlay(d, true);
+      updateArcLabels();
       return;   // skip applyCurrentFilter – highlight takes precedence
     } else {
       selectedId = null;
@@ -849,8 +884,12 @@ function onClick(event, d) {
   if (!isArcActive(d)) return;
 
   if (selectedId === d.record_id) {
-    // Clicking the selected arc again → deselect
-    deselect();
+    // On mobile: if sheet is closed, re-open it; otherwise deselect
+    if (isMobile && !document.getElementById('info').classList.contains('open')) {
+      updateSidebar(d, getSiblings(d));
+    } else {
+      deselect();
+    }
   } else {
     selectedId  = d.record_id;
     selectedIdx = allData.indexOf(d);
@@ -860,6 +899,7 @@ function onClick(event, d) {
     drawOverlay(d, true);
     updateSidebar(d, getSiblings(d));
     updateBottomNav();
+    updateArcLabels();
   }
 }
 
@@ -869,9 +909,241 @@ function deselect() {
   hoveredId   = null;
   hideMiniTooltip();
   updateBottomNav();
+  updateArcLabels();
   gHigh.selectAll('*').remove();
   applyCurrentFilter();
   showEmptySidebar();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLOSE SIDEBAR (mobile: keeps selection)
+// ═══════════════════════════════════════════════════════════
+
+function closeSidebar() {
+  document.getElementById('info').classList.remove('open');
+  // selectedId is kept intact — arc stays highlighted
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ARC LABELS (desktop only)
+// ═══════════════════════════════════════════════════════════
+
+function updateArcLabels() {
+  if (!svgSel) return;
+  if (isMobile) { updateMobileLabels(); return; }
+  svgSel.selectAll('.g-labels').remove();
+  if (!showLabels || !selectedId) return;
+  const d = allData.find(r => r.record_id === selectedId);
+  if (!d) return;
+  drawArcLabels(d, getSiblings(d));
+}
+
+// Mobile: compact HTML label stack in the left panel of #viz-wrap
+function updateMobileLabels() {
+  const panel = document.getElementById('mobile-label-panel');
+  if (!showLabels || !selectedId) {
+    panel.classList.remove('visible');
+    panel.innerHTML = '';
+    return;
+  }
+  const d = allData.find(r => r.record_id === selectedId);
+  if (!d) { panel.classList.remove('visible'); panel.innerHTML = ''; return; }
+
+  panel.innerHTML = '';
+  panel.classList.add('visible');
+
+  const items = [d, ...getSiblings(d)];
+  items.forEach(item => {
+    const isMain = item.record_id === d.record_id;
+    const color  = mColor(item.medium);
+    const card   = document.createElement('div');
+    card.className = 'mobile-label-card' + (isMain ? ' is-main' : '');
+    card.style.borderColor = isMain ? color + 'aa' : color + '44';
+    const title  = item.title.length > 14 ? item.title.slice(0, 14) + '…' : item.title;
+    card.innerHTML = `
+      <div class="mlc-title" style="color:${isMain ? '#f0ede8' : color + 'cc'}">${title}</div>
+      <div class="mlc-years">${fmt(item.released)} → ${fmt(item.year_set)}</div>
+    `;
+    panel.appendChild(card);
+  });
+}
+
+// Label dimensions (shared by all label helpers)
+const LBL_W = 152, LBL_H = 34, LBL_HGAP = 6, LBL_VGAP = 6;
+
+// Returns the screen-space apex of a Bézier arc
+function arcApex(item) {
+  const x1   = scaleX(item.released);
+  const x2   = getX2(item);
+  const span = Math.abs(x2 - x1);
+  const h    = Math.max(ARC_MIN_H, Math.min(span * ARC_HEIGHT_RATIO, maxArcH));
+  const xm   = (x1 + x2) / 2;
+  const yc   = item._above ? yMid - h : yMid + h;
+  return {
+    ax: (x1 + 2 * xm + x2) / 4,   // t = 0.5 on quadratic Bézier
+    ay: (yMid + yc) / 2,
+  };
+}
+
+function drawArcLabels(d, siblings) {
+  const W = +svgSel.attr('width');
+  const H = +svgSel.attr('height');
+  const g = svgSel.append('g').attr('class', 'g-labels').attr('pointer-events', 'none');
+
+  const all = [d, ...siblings];
+
+  // Build initial layout entries — labels anchored near the SVG margins,
+  // not near the arcs, so leader lines cross the full arc area.
+  const entries = all.map(item => {
+    const { ax, ay } = arcApex(item);
+    return {
+      item,
+      ax, ay,
+      isMain: item.record_id === d.record_id,
+      above:  item._above,
+      lx: ax - LBL_W / 2,
+      ly: item._above
+        ? MARGIN.top + 2                          // near top edge
+        : H - MARGIN.bottom - LBL_H - 2,          // near bottom edge
+      row: 0,
+    };
+  });
+
+  // Resolve overlaps separately for above-axis and below-axis groups
+  spreadLabels(entries.filter(e =>  e.above), W);
+  spreadLabels(entries.filter(e => !e.above), W);
+
+  // Clamp label tops/bottoms to SVG bounds
+  entries.forEach(e => {
+    e.ly = Math.max(4, Math.min(e.ly, H - LBL_H - 4));
+  });
+
+  // Draw siblings first (behind), main arc label last (in front)
+  [...entries].sort((a, b) => a.isMain - b.isMain)
+    .forEach(e => renderLabel(g, e));
+}
+
+// Distributes a group of labels (all above-axis OR all below-axis):
+// - sorts by apex x
+// - assigns odd-indexed items to a second vertical row to reduce horizontal crowding
+// - spreads each row horizontally so labels don't overlap
+function spreadLabels(group, W) {
+  if (group.length === 0) return;
+  group.sort((a, b) => a.ax - b.ax);
+
+  if (group.length === 1) {
+    group[0].lx = Math.max(MARGIN.left, Math.min(group[0].lx, W - MARGIN.right - LBL_W));
+    return;
+  }
+
+  // Alternate rows: row 1 steps inward from the edge (toward the arc area)
+  group.forEach((l, i) => {
+    l.row = i % 2;
+    if (l.row === 1) {
+      l.ly = l.above
+        ? l.ly + (LBL_H + LBL_VGAP)   // above-group row 1: slightly lower than row 0
+        : l.ly - (LBL_H + LBL_VGAP);  // below-group row 1: slightly higher than row 0
+    }
+  });
+
+  // Spread each row horizontally
+  [0, 1].forEach(rowIdx => {
+    spreadRow(group.filter(l => l.row === rowIdx), W);
+  });
+}
+
+// Pushes a sorted row of labels apart horizontally so none overlap.
+// Uses a left→right pass (push right) then right→left pass (clamp & pull back).
+function spreadRow(group, W) {
+  if (group.length <= 1) return;
+
+  const minX = MARGIN.left;
+  const maxX = W - MARGIN.right - LBL_W;
+
+  // Pass 1 – left to right: ensure each label clears the previous one
+  for (let i = 1; i < group.length; i++) {
+    const needed = group[i - 1].lx + LBL_W + LBL_HGAP;
+    if (group[i].lx < needed) group[i].lx = needed;
+  }
+
+  // Clamp rightmost to right bound
+  group[group.length - 1].lx = Math.min(group[group.length - 1].lx, maxX);
+
+  // Pass 2 – right to left: pull back if the clamp shifted things
+  for (let i = group.length - 2; i >= 0; i--) {
+    const cap = group[i + 1].lx - LBL_W - LBL_HGAP;
+    if (group[i].lx > cap) group[i].lx = cap;
+  }
+
+  // Final clamp for all
+  group.forEach(l => {
+    l.lx = Math.max(minX, Math.min(l.lx, maxX));
+  });
+}
+
+// Renders a single label box with a leader line from arc apex to label.
+// The rect captures hover events and highlights the connector line on mouseenter.
+function renderLabel(g, { item, ax, ay, lx, ly, above, isMain }) {
+  const color   = mColor(item.medium);
+  const labelCx = lx + LBL_W / 2;
+  const lineY2  = above ? ly + LBL_H : ly;
+
+  // Leader line — stored so the hover handler can modify it
+  const line = g.append('line')
+    .attr('x1', ax).attr('y1', ay)
+    .attr('x2', labelCx).attr('y2', lineY2)
+    .attr('stroke', color).attr('stroke-opacity', 0.28)
+    .attr('stroke-width', 1).attr('stroke-dasharray', '3 2');
+
+  // Dot at apex — stored for hover animation
+  const dot = g.append('circle')
+    .attr('cx', ax).attr('cy', ay)
+    .attr('r', 3).attr('fill', color).attr('opacity', 0.5);
+
+  // Background rect — pointer-events enabled so it captures hover
+  g.append('rect')
+    .attr('x', lx).attr('y', ly)
+    .attr('width', LBL_W).attr('height', LBL_H)
+    .attr('rx', 5)
+    .attr('fill', '#12121f').attr('fill-opacity', 0.92)
+    .attr('stroke', color)
+    .attr('stroke-opacity', isMain ? 0.65 : 0.3)
+    .attr('stroke-width', isMain ? 1.2 : 0.8)
+    .attr('pointer-events', 'all')
+    .on('mouseenter', () => {
+      line
+        .attr('stroke-opacity', 0.85)
+        .attr('stroke-width', 1.8)
+        .attr('stroke-dasharray', null);
+      dot.attr('r', 5).attr('opacity', 0.9);
+    })
+    .on('mouseleave', () => {
+      line
+        .attr('stroke-opacity', 0.28)
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3 2');
+      dot.attr('r', 3).attr('opacity', 0.5);
+    });
+
+  // Title text
+  const title = item.title.length > 20 ? item.title.slice(0, 20) + '…' : item.title;
+  g.append('text')
+    .attr('x', labelCx).attr('y', ly + 13)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', '10px')
+    .attr('font-weight', isMain ? '600' : '400')
+    .attr('fill', isMain ? '#f0ede8' : '#c8c4d0')
+    .attr('font-family', "'Segoe UI', system-ui, sans-serif")
+    .text(title);
+
+  // Year range text
+  g.append('text')
+    .attr('x', labelCx).attr('y', ly + 26)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', '9px')
+    .attr('fill', color).attr('opacity', 0.8)
+    .attr('font-family', "'Segoe UI', system-ui, sans-serif")
+    .text(`${fmt(item.released)} → ${fmt(item.year_set)}`);
 }
 
 // ═══════════════════════════════════════════════════════════

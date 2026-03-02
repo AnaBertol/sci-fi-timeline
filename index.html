@@ -38,12 +38,19 @@
             <input type="text" id="search-input" placeholder="Search by title…" autocomplete="off" spellcheck="false"/>
             <button id="search-clear" aria-label="Clear search">×</button>
           </div>
+          <button id="btn-labels" title="Show labels on arcs">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 4h8l4 3-4 3H1V4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+              <circle cx="4" cy="7" r="1" fill="currentColor"/>
+            </svg>
+          </button>
         </div>
       </div>
     </div>
 
     <div id="viz-wrap">
       <svg id="viz"></svg>
+      <div id="mobile-label-panel"></div>
     </div>
 
   </div>
@@ -52,12 +59,7 @@
   <div id="info">
 
     <div id="info-handle"></div>
-
-    <div id="bottom-nav">
-      <button class="bnav-btn" id="btn-prev" aria-label="Previous">←</button>
-      <span id="bnav-count"></span>
-      <button class="bnav-btn" id="btn-next" aria-label="Next">→</button>
-    </div>
+    <button id="btn-close-info" aria-label="Close panel">×</button>
 
     <div id="info-empty">
       Hover over an arc<br>to see details.
@@ -89,6 +91,16 @@
       <div id="info-links"></div>
 
     </div>
+  </div>
+
+  <!-- ── Mobile arc navigation (fixed bar, outside info sheet) ── -->
+  <div id="bottom-nav">
+    <button class="bnav-btn" id="btn-prev" aria-label="Previous">←</button>
+    <div id="bnav-middle">
+      <div id="bnav-title"></div>
+      <div id="bnav-count"></div>
+    </div>
+    <button class="bnav-btn" id="btn-next" aria-label="Next">→</button>
   </div>
 
   <!-- ── Mini tooltip (follows cursor) ── -->
