@@ -247,6 +247,7 @@ function navigateArc(dir) {
   applyHighlight(d, true);
   drawOverlay(d, true);
   updateSidebar(d, getSiblings(d));
+  updateBottomNav();
 }
 
 function updateBottomNav() {
