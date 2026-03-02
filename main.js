@@ -453,8 +453,14 @@ function drawViz() {
   // Arcs layer — visual only, no pointer events
   gArcs = svgSel.append('g').attr('class', 'g-arcs');
 
+  // Render longer arcs first so they sit behind shorter ones,
+  // making short arcs always clickable on top.
+  const renderOrder = [...allData].sort((a, b) =>
+    Math.abs(b.years_distant) - Math.abs(a.years_distant)
+  );
+
   gArcs.selectAll('.arc')
-    .data(allData, d => d.record_id)
+    .data(renderOrder, d => d.record_id)
     .join('path')
     .attr('class', 'arc')
     .attr('d', makeArcPath)
