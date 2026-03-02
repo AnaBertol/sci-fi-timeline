@@ -524,23 +524,6 @@ body {
   /* Hide "Medium" / "Scale" labels to save space */
   .control-label { display: none; }
 
-  /* First control row: don't wrap, let filters scroll */
-  .control-row:first-child { flex-wrap: nowrap; }
-
-  /* Filter buttons scroll horizontally instead of wrapping */
-  #medium-filters {
-    flex: 1;
-    min-width: 0;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
-    scrollbar-width: none;
-    /* Fade right edge to signal there's more content */
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
-  }
-  #medium-filters::-webkit-scrollbar { display: none; }
 
   /* Bottom sheet */
   #info {
