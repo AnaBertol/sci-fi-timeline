@@ -879,7 +879,7 @@ function showMiniTooltip(event, d) {
   const el = getTT();
   el.innerHTML = `
     <div class="mtt-title">${d.title || '—'}</div>
-    <div class="mtt-years">${fmt(d.released)} → ${yearLabel(d)}</div>
+    <div class="mtt-years">${fmt(d.released)} → ${fmt(d.year_set)}</div>
     ${d.medium ? `<div class="mtt-meta">${d.medium}</div>` : ''}
   `;
   el.style.display = 'block';
@@ -933,7 +933,7 @@ function updateSidebar(d, siblings) {
   document.getElementById('info-timeline').innerHTML = `
     <div class="tl-year">${fmt(d.released)}<span>released</span></div>
     <div class="tl-arrow">↓ ${pluralYears(d.years_distant)} ahead</div>
-    <div class="tl-year" style="color:${color}">${yearLabel(d)}<span>${subLabel}</span></div>
+    <div class="tl-year" style="color:${color}">${fmt(d.year_set)}<span>${subLabel}</span></div>
     ${periodHtml}
   `;
 
@@ -957,7 +957,7 @@ function updateSidebar(d, siblings) {
       item.className = 'series-item';
       item.innerHTML = `
         <div class="series-item-title">${s.title}</div>
-        <div class="series-item-years">${fmt(s.released)} → ${yearLabel(s)}</div>
+        <div class="series-item-years">${fmt(s.released)} → ${fmt(s.year_set)}</div>
       `;
 
       // Hover series item: temporarily highlight that sibling in the viz
